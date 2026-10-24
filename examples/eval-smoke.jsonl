@@ -1,0 +1,5 @@
+{"qid":"s1","query":"E1024 连接超时","relevant":["tests/fixtures/sample.pdf"],"type":"keyword"}
+{"qid":"s2","query":"向量召回与关键词匹配","relevant":["tests/fixtures/sample.pptx"],"type":"semantic"}
+{"qid":"s3","query":"图片 OCR 识别","relevant":["tests/fixtures/sample.png"],"type":"mixed"}
+{"qid":"s4","query":"中文编码测试","relevant":["tests/fixtures/gb18030.txt"],"type":"keyword"}
+{"qid":"s5","query":"重排模型怎么提升准确率","relevant":["tests/fixtures/sample.docx"],"type":"semantic"}

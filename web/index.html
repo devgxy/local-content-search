@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>本地内容检索</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⌕</span>
+      <div>
+        <h1>本地内容检索</h1>
+        <p class="sub">全离线 · 内容级搜索 · 混合检索 + 重排</p>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-view="search">搜索</button>
+      <button class="tab" data-view="library">资料库</button>
+      <button class="tab" data-view="sync">同步 <span class="pill hidden" id="sync-badge">0</span></button>
+      <button class="tab" data-view="settings">设置</button>
+    </nav>
+    <button class="status" id="status" title="查看设置">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">启动中</span>
+    </button>
+  </header>
+
+  <div class="statusline">
+    <span id="status-stats">文档 — · Chunk — · 上次同步 —</span>
+    <span class="spacer"></span>
+    <span id="status-model" class="muted"></span>
+  </div>
+
+  <main>
+    <!-- 搜索 -->
+    <section class="view active" id="view-search">
+      <div class="searchbox">
+        <input id="query" type="search" placeholder="搜索正文，例如：E1024 连接超时、混合检索延迟怎么优化" autocomplete="off">
+        <button class="primary" id="search-btn">搜索</button>
+      </div>
+      <div class="filters">
+        <label>类型
+          <select id="filter-type">
+            <option value="">全部</option>
+            <option value="md">Markdown</option>
+            <option value="txt">TXT</option>
+            <option value="pdf">PDF</option>
+            <option value="docx">DOCX</option>
+            <option value="pptx">PPTX</option>
+            <option value="html">HTML</option>
+            <option value="json">JSON</option>
+            <option value="csv">CSV</option>
+            <option value="image">图片</option>
+          </select>
+        </label>
+        <label>索引根
+          <select id="filter-root"><option value="">全部</option></select>
+        </label>
+        <label>检索方式
+          <select id="search-mode">
+            <option value="auto" selected>自动（全局重排 / 选文件 hybrid）</option>
+            <option value="hybrid">混合（RRF）</option>
+            <option value="full">智能（混合+重排）</option>
+            <option value="hybrid_rerank">混合+重排（无文档限流）</option>
+            <option value="fts">关键词（BM25）</option>
+            <option value="vector">语义（向量）</option>
+          </select>
+        </label>
+        <label>速度
+          <select id="search-profile">
+            <option value="accurate">精准</option>
+            <option value="fast">快速</option>
+          </select>
+        </label>
+        <label class="inline"><input id="doc-level" type="checkbox"> 文档级结果</label>
+        <label>初筛 <input id="top-k" type="number" min="5" max="50" value="20"></label>
+        <label>最终 <input id="final-k" type="number" min="1" max="20" value="5"></label>
+        <span class="spacer"></span>
+        <span class="scope-label" id="scope-label">范围：全部文件</span>
+        <button id="clear-scope" class="ghost hidden">清空范围</button>
+        <span class="muted" id="search-meta"></span>
+      </div>
+      <div id="results" class="results">
+        <div class="empty">输入关键词，开始搜索正文内容。</div>
+      </div>
+    </section>
+
+    <!-- 资料库 -->
+    <section class="view" id="view-library">
+      <div class="toolbar">
+        <input id="library-query" type="search" placeholder="按路径过滤…">
+        <span class="spacer"></span>
+        <span class="muted" id="library-total"></span>
+      </div>
+      <div class="scope-hint">
+        勾选文件可限定检索范围；不勾选则全局检索。已选 <strong id="scope-count">0</strong> 个文件。
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th class="check"><input id="library-select-all" type="checkbox" title="选择当前页"></th><th>文件</th><th>类型</th><th>Chunk</th><th>状态</th><th>索引时间</th><th></th></tr>
+          </thead>
+          <tbody id="library-body"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="library-prev">上一页</button>
+        <span id="library-page">1</span>
+        <button id="library-next">下一页</button>
+      </div>
+    </section>
+
+    <!-- 同步 -->
+    <section class="view" id="view-sync">
+      <div class="card">
+        <div class="card-head">
+          <h2>索引范围</h2>
+          <span class="muted">先添加文件夹，再检查更新；不会自动写入索引。</span>
+        </div>
+        <div class="row">
+          <input id="root-input" type="text" placeholder="选择文件夹，或输入 /Users/you/Documents/资料">
+          <button id="pick-root-btn">选择文件夹…</button>
+          <button id="add-root-btn">添加</button>
+        </div>
+        <ul class="roots" id="roots-list"></ul>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>变更检查</h2>
+          <button class="primary" id="scan-btn">检查更新</button>
+        </div>
+        <div id="diff-summary" class="muted">尚未检查。点击“检查更新”扫描索引根。</div>
+        <div id="diff-errors" class="diff-errors" hidden></div>
+        <div class="diff-grid" id="diff-grid" hidden>
+          <div class="diff-col">
+            <h3>新增 <span id="count-added">0</span></h3>
+            <div id="diff-added" class="diff-list"></div>
+          </div>
+          <div class="diff-col">
+            <h3>修改 <span id="count-modified">0</span></h3>
+            <div id="diff-modified" class="diff-list"></div>
+          </div>
+          <div class="diff-col">
+            <h3>删除 <span id="count-deleted">0</span></h3>
+            <div id="diff-deleted" class="diff-list"></div>
+          </div>
+        </div>
+        <div class="row sync-actions">
+          <label class="check"><input type="checkbox" id="delete-missing"> 同时删除缺失文件</label>
+          <span class="spacer"></span>
+          <button class="primary" id="sync-btn" disabled>同步选中</button>
+        </div>
+        <div class="progress hidden" id="job-progress">
+          <div class="bar"><span id="job-bar"></span></div>
+          <div class="muted" id="job-message"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 设置 -->
+    <section class="view" id="view-settings">
+      <div class="card">
+        <div class="card-head"><h2>健康状态</h2><button id="refresh-health">刷新</button></div>
+        <div id="health-cards" class="cards"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>索引统计</h2></div>
+        <div id="stats-cards" class="cards"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>服务控制</h2></div>
+        <div class="muted">关闭后网页将不可用；下次双击“启动本地检索.command”重新启动。</div>
+        <button class="danger" id="shutdown-btn" style="margin-top: 10px">关闭服务</button>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>参数</h2></div>
+        <div class="muted">
+          切片 400 字 / 重叠 50 字；检索 top_k 20 / final_k 5；
+          FTS 分词器 ICU；向量模型 bge-large-zh-v1.5；重排 bge-reranker-large。
+          修改参数需重启服务。
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="original-dialog">
+    <div class="dialog-head">
+      <h2 id="original-title">原文件预览</h2>
+      <button id="original-close">关闭</button>
+    </div>
+    <div class="muted" id="original-meta"></div>
+    <div id="original-body" class="original-body"></div>
+    <div class="dialog-actions">
+      <button id="original-open">打开原文件</button>
+    </div>
+  </dialog>
+
+  <dialog id="hit-dialog">
+    <div class="dialog-head">
+      <h2 id="hit-title">命中内容</h2>
+      <button id="hit-close">关闭</button>
+    </div>
+    <div class="muted" id="hit-meta"></div>
+    <div id="hit-context" class="hit-context"></div>
+    <div class="dialog-actions">
+      <button id="hit-finder">在 Finder 中显示</button>
+      <button id="hit-open">打开原文件</button>
+    </div>
+  </dialog>
+
+  <dialog id="doc-dialog">
+    <div class="dialog-head">
+      <h2 id="doc-title">文档</h2>
+      <button id="doc-close">关闭</button>
+    </div>
+    <div class="muted" id="doc-meta"></div>
+    <div id="doc-preview" class="doc-preview hidden"></div>
+    <div id="doc-chunks" class="chunk-list"></div>
+    <div class="dialog-actions">
+      <button id="doc-open">打开文件</button>
+      <button id="doc-reindex">重建索引</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast hidden"></div>
+</body>
+</html>
