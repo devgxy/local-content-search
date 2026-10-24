@@ -35,6 +35,8 @@ RAG = Retrieval-Augmented Generation，检索增强生成。
 
 ## 1.2 完整链路
 
+![RAG 数据链路](images/rag-pipeline.png)
+
 ```text
 原始文件
   ↓
