@@ -22,7 +22,7 @@ macOS 本地内容混合检索系统：文件解析、OCR、结构感知切片�
 ## 快速开始
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/devgxy/local-content-search.git
 cd local-content-search
 
 python3.11 -m venv .venv
@@ -84,6 +84,7 @@ reports/    # 公开验收摘要（不含个人数据）
 - [评测方案](docs/03-评测方案.md)
 - [工程实现与代码映射](docs/06-工程实现与代码映射.md)
 - [v1.2 验收摘要](reports/v1.2-acceptance.md)
+- [RAG 工程手册（文章目录）](docs/article/README.md)
 
 ## 隐私与数据
 
@@ -94,7 +95,7 @@ reports/    # 公开验收摘要（不含个人数据）
 - 个人路径、姓名、电话、邮箱；
 - 原始评测语料。
 
-`data/`、`.models/`、`reports/evidence/`、`tests/fixtures/` 等通过 `.gitignore` 排除。
+`data/`、`.models/`、`tests/fixtures/` 等通过 `.gitignore` 排除；`reports/evidence/` 仅保留脱敏聚合证据。
 
 ## 已知边界
 
